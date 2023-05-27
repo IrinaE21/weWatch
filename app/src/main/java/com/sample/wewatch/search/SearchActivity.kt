@@ -26,16 +26,19 @@ import io.reactivex.schedulers.Schedulers
 
 //const val SEARCH_QUERY = "searchQuery"
 
-class SearchActivity : AppCompatActivity() {
-  private val TAG = "SearchActivity"
+class SearchActivity : AppCompatActivity(), SearchContract.ViewInterface {
   private lateinit var searchResultsRecyclerView: RecyclerView
   private lateinit var adapter: SearchAdapter
   private lateinit var noMoviesTextView: TextView
   private lateinit var progressBar: ProgressBar
   private var query = ""
 
-  private var dataSource = RemoteDataSource()
-  private val compositeDisposable = CompositeDisposable()
+
+  private lateinit var searchPresenter: SearchPresenter
+  private fun setupPresenter() {
+    val dataSource = RemoteDataSource()
+    searchPresenter = SearchPresenter(this, dataSource)
+  }
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
@@ -46,55 +49,26 @@ class SearchActivity : AppCompatActivity() {
 
     val i = intent
     query = i.getStringExtra(SEARCH_QUERY) ?: ""
+    setupPresenter()
     setupViews()
   }
 
   override fun onStart() {
     super.onStart()
     progressBar.visibility = VISIBLE
-    getSearchResults(query)
+    searchPresenter.getSearchResults(query)
   }
 
   override fun onStop() {
     super.onStop()
-    compositeDisposable.clear()
+    searchPresenter.stop()
   }
 
   private fun setupViews() {
     searchResultsRecyclerView.layoutManager = LinearLayoutManager(this)
   }
 
-  fun getSearchResults(query: String) {
-    val searchResultsDisposable = searchResultsObservable(query)
-        .subscribeOn(Schedulers.io())
-        .observeOn(AndroidSchedulers.mainThread())
-        .subscribeWith(observer)
-
-    compositeDisposable.add(searchResultsDisposable)
-  }
-
-  val searchResultsObservable: (String) -> Observable<TmdbResponse> = { query -> dataSource.searchResultsObservable(query) }
-
-  val observer: DisposableObserver<TmdbResponse>
-    get() = object : DisposableObserver<TmdbResponse>() {
-
-      override fun onNext(@NonNull tmdbResponse: TmdbResponse) {
-        Log.d(TAG, "OnNext" + tmdbResponse.totalResults)
-        displayResult(tmdbResponse)
-      }
-
-      override fun onError(@NonNull e: Throwable) {
-        Log.d(TAG, "Error$e")
-        e.printStackTrace()
-        displayError("Error fetching Movie Data")
-      }
-
-      override fun onComplete() {
-        Log.d(TAG, "Completed")
-      }
-    }
-
-  fun displayResult(tmdbResponse: TmdbResponse) {
+  override fun displayResult(tmdbResponse: TmdbResponse) {
     progressBar.visibility = INVISIBLE
 
     if (tmdbResponse.totalResults == null || tmdbResponse.totalResults == 0) {
@@ -110,11 +84,15 @@ class SearchActivity : AppCompatActivity() {
     }
   }
 
+  override fun displayMessage(message: String) {
+    Toast.makeText(this@SearchActivity, message, Toast.LENGTH_LONG).show()
+  }
+
   fun showToast(string: String) {
     Toast.makeText(this@SearchActivity, string, Toast.LENGTH_LONG).show()
   }
 
-  fun displayError(string: String) {
+  override fun displayError(string: String) {
     showToast(string)
   }
 
