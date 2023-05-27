@@ -1,5 +1,6 @@
 package com.sample.wewatch.main
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
@@ -35,16 +36,15 @@ class MainActivity : AppCompatActivity(), MainContract.ViewInterface {
   private lateinit var noMoviesLayout: LinearLayout
 
   private lateinit var dataSource: LocalDataSource
-  private val compositeDisposable = CompositeDisposable()
 
   private val TAG = "MainActivity"
 
   private lateinit var mainPresenter: MainContract.PresenterInterface
+
   private fun setupPresenter() {
     val dataSource = LocalDataSource(application)
     mainPresenter = MainPresenter(this, dataSource)
   }
-
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
@@ -55,13 +55,12 @@ class MainActivity : AppCompatActivity(), MainContract.ViewInterface {
 
   override fun onStart() {
     super.onStart()
-    dataSource = LocalDataSource(application)
-    getMyMoviesList()
+    mainPresenter.getMyMoviesList()
   }
 
   override fun onStop() {
     super.onStop()
-    compositeDisposable.clear()
+    mainPresenter.stop()
   }
 
   private fun setupViews() {
@@ -72,49 +71,23 @@ class MainActivity : AppCompatActivity(), MainContract.ViewInterface {
     supportActionBar?.title = "Movies to Watch"
   }
 
-  private fun getMyMoviesList() {
-    val myMoviesDisposable = myMoviesObservable
-        .subscribeOn(Schedulers.io())
-        .observeOn(AndroidSchedulers.mainThread())
-        .subscribeWith(observer)
+  override fun displayMovies(movieList: List<Movie>) {
+    adapter = MainAdapter(movieList, this@MainActivity)
+    moviesRecyclerView.adapter = adapter
 
-    compositeDisposable.add(myMoviesDisposable)
+    moviesRecyclerView.visibility = VISIBLE
+    noMoviesLayout.visibility = INVISIBLE
   }
 
-  private val myMoviesObservable: Observable<List<Movie>>
-    get() = dataSource.allMovies
+  override fun displayNoMovies() {
+    Log.d(TAG, "No movies to display.")
+    moviesRecyclerView.visibility = INVISIBLE
+    noMoviesLayout.visibility = VISIBLE
+  }
 
-
-  private val observer: DisposableObserver<List<Movie>>
-    get() = object : DisposableObserver<List<Movie>>() {
-
-      override fun onNext(movieList: List<Movie>) {
-        displayMovies(movieList)
-      }
-
-      override fun onError(@NonNull e: Throwable) {
-        Log.d(TAG, "Error$e")
-        e.printStackTrace()
-        displayError("Error fetching movie list")
-      }
-
-      override fun onComplete() {
-        Log.d(TAG, "Completed")
-      }
-    }
-
-  fun displayMovies(movieList: List<Movie>?) {
-    if (movieList == null || movieList.size == 0) {
-      Log.d(TAG, "No movies to display")
-      moviesRecyclerView.visibility = INVISIBLE
-      noMoviesLayout.visibility = VISIBLE
-    } else {
-      adapter = MainAdapter(movieList, this@MainActivity)
-      moviesRecyclerView.adapter = adapter
-
-      moviesRecyclerView.visibility = VISIBLE
-      noMoviesLayout.visibility = INVISIBLE
-    }
+  override fun displayMessage(message: String) {
+    Toast.makeText(this, message, Toast. LENGTH_LONG )
+      .show()
   }
 
   //fab onClick
@@ -159,8 +132,8 @@ class MainActivity : AppCompatActivity(), MainContract.ViewInterface {
     Toast.makeText(this@MainActivity, str, Toast.LENGTH_LONG).show()
   }
 
-  fun displayError(e: String) {
-    showToast(e)
+  override fun displayError(message: String) {
+    displayMessage (message)
   }
 
   companion object {
