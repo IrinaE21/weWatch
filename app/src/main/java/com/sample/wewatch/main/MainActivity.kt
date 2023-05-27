@@ -112,19 +112,8 @@ class MainActivity : AppCompatActivity(), MainContract.ViewInterface {
 
   override fun onOptionsItemSelected(item: MenuItem): Boolean {
     if (item.itemId == R.id.deleteMenuItem) {
-      val adapter = this.adapter
-      if (adapter != null) {
-        for (movie in adapter.selectedMovies) {
-          dataSource.delete(movie)
-        }
-        if (adapter.selectedMovies.size == 1) {
-          showToast("Movie deleted")
-        } else if (adapter.selectedMovies.size > 1) {
-          showToast("Movies deleted")
-        }
-      }
+      mainPresenter.onDeleteTapped(adapter!!.selectedMovies)
     }
-
     return super.onOptionsItemSelected(item)
   }
 
